@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>エラー発火ツール — Instana Demo</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'IBM Plex Sans', 'Helvetica Neue', Arial, sans-serif;
+      background: #161616;
+      color: #f4f4f4;
+      min-height: 100vh;
+    }
+    header {
+      background: #161616;
+      border-bottom: 1px solid #393939;
+      padding: 16px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .logo { font-size: 1rem; font-weight: 800; color: #f4f4f4; display: flex; align-items: center; gap: 10px; }
+    .logo-badge { background: #0f62fe; color: white; font-size: 11px; padding: 2px 8px; }
+    .header-right { font-size: 12px; color: #8d8d8d; }
+    .main { max-width: 1400px; margin: 0 auto; padding: 40px 32px; }
+    .page-title { font-size: 2rem; font-weight: 300; color: #f4f4f4; margin-bottom: 8px; }
+    .page-subtitle { font-size: 14px; color: #c6c6c6; margin-bottom: 40px; }
+
+    .row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px; margin-bottom: 2px; }
+
+    .error-card {
+      background: #262626;
+      padding: 28px 24px;
+      cursor: pointer;
+      transition: background 0.15s;
+      position: relative;
+      border: 1px solid transparent;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      min-height: 220px;
+    }
+    .error-card:hover { background: #333333; border-color: #0f62fe; }
+    .error-card.active { background: #0d3c8c; border-color: #0f62fe; }
+    .error-card.success { background: #022d0d; border-color: #24a148; }
+    .error-card.error-state { background: #2d0d0d; border-color: #da1e28; }
+    .status-dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      position: absolute; top: 18px; right: 18px;
+      background: #6f6f6f;
+    }
+    .error-card.active .status-dot { background: #0f62fe; animation: pulse 1s infinite; }
+    .error-card.success .status-dot { background: #24a148; }
+    .error-card.error-state .status-dot { background: #da1e28; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+    .card-tag {
+      display: inline-block;
+      font-size: 15px;
+      font-weight: 800;
+      padding: 4px 12px;
+      width: fit-content;
+    }
+    .tag-http           { background: #6929c4; color: white; }
+    .tag-database       { background: #0043ce; color: white; }
+    .tag-infrastructure { background: #005d5d; color: white; }
+    .tag-performance    { background: #b28600; color: white; }
+    .tag-dependency     { background: #9f1853; color: white; }
+
+    .card-emoji { font-size: 2.2rem; }
+    .card-title { font-size: 16px; font-weight: 800; color: #f4f4f4; }
+    .card-desc  { font-size: 15px; color: #c6c6c6; line-height: 1.6; flex: 1; }
+
+    .log-section { background: #262626; padding: 24px; margin-top: 32px; }
+    .log-header { display: flex; align-items: center; margin-bottom: 16px; }
+    .log-title { font-size: 14px; font-weight: 800; color: #f4f4f4; flex: 1; }
+    .log-clear { font-size: 12px; color: #0f62fe; cursor: pointer; background: none; border: none; }
+    .log-clear:hover { text-decoration: underline; }
+    .log-body { font-family: 'IBM Plex Mono', monospace; font-size: 12px; max-height: 200px; overflow-y: auto; }
+    .log-entry { padding: 4px 0; border-bottom: 1px solid #393939; display: flex; gap: 12px; }
+    .log-time { color: #6f6f6f; white-space: nowrap; }
+    .log-msg.ok   { color: #24a148; }
+    .log-msg.err  { color: #da1e28; }
+    .log-msg.info { color: #0f62fe; }
+
+    footer {
+      border-top: 1px solid #393939;
+      padding: 16px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+      color: #6f6f6f;
+      margin-top: 40px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo">
+      <span>🎰 エラー発火ツール</span>
+      <span class="logo-badge">Instana Demo</span>
+    </div>
+    <div class="header-right">Backend: http://3.227.230.6:8000</div>
+  </header>
+
+  <div class="main">
+    <h1 class="page-title">エラー発火ツール</h1>
+    <p class="page-subtitle">カードをクリックしてエラーを発火させます — IBM Instana がリアルタイムで検知します</p>
+
+    <!-- 上段: HTTP Error × 1, Infrastructure × 3 -->
+    <div class="row" id="row1"></div>
+    <!-- 下段: Database × 2, Performance × 1, Dependency × 1 -->
+    <div class="row" id="row2"></div>
+
+    <div class="log-section">
+      <div class="log-header">
+        <span class="log-title">📋 実行ログ</span>
+        <button class="log-clear" onclick="clearLog()">クリア</button>
+      </div>
+      <div class="log-body" id="log">
+        <div class="log-entry"><span class="log-time">--:--:--</span><span class="log-msg info">// カードをクリックしてエラーを発火してください</span></div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <span>IBM Instana Observability × IBM Bob — 障害自動対応デモ</span>
+    <span>© 2026 IBM Corporation</span>
+  </footer>
+
+  <script>
+    const ROW1 = [
+      { id: '501',         label: '501 Not Implemented', emoji: '🚧', tag: 'HTTP Error',     tagClass: 'tag-http',           desc: '未実装エンドポイントへのリクエスト。HTTPステータス501を返しInstanaがエラー率の上昇を検知。' },
+      { id: 'memory_leak', label: 'メモリリーク',         emoji: '🔥', tag: 'Infrastructure', tagClass: 'tag-infrastructure', desc: '大量のオブジェクトをヒープに確保。Instanaのインフラメトリクスでメモリ使用量の急増を確認可能。' },
+      { id: 'cpu_spike',   label: 'CPU使用率100%',       emoji: '🌡', tag: 'Infrastructure', tagClass: 'tag-infrastructure', desc: '3秒間CPU集中処理を実行。Instanaのホストメトリクスでリアルタイムにスパイクを確認。' },
+      { id: 'disk_full',   label: 'ディスク容量不足',     emoji: '💾', tag: 'Infrastructure', tagClass: 'tag-infrastructure', desc: 'HTTPステータス507を返しストレージ不足を模擬。Instanaがインフラアラートとして検知。' },
+    ];
+    const ROW2 = [
+      { id: 'db_timeout',        label: 'DBタイムアウト',       emoji: '⏱',  tag: 'Database',    tagClass: 'tag-database',    desc: 'データベース接続を8秒間ブロック。Instanaがレスポンスタイムの異常を検知しアラートを発火。' },
+      { id: 'deadlock',          label: 'デッドロック検知',     emoji: '⚔️',  tag: 'Database',    tagClass: 'tag-database',    desc: '同一トランザクションの二重ロック取得によりデッドロックを発生。DBエラーとしてトレースに記録。' },
+      { id: 'slow_query',        label: 'スロークエリ',         emoji: '🐌',  tag: 'Performance', tagClass: 'tag-performance', desc: 'レスポンスを5秒間遅延。Instanaのレイテンシグラフに異常スパイクとして記録される。' },
+      { id: 'external_api_fail', label: '外部API呼び出し失敗', emoji: '🌐',  tag: 'Dependency',  tagClass: 'tag-dependency',  desc: '存在しない外部APIにリクエストを送信。Instanaの依存関係マップで失敗した外部呼び出しを可視化。' },
+    ];
+
+    function buildRow(rowId, errors) {
+      const row = document.getElementById(rowId);
+      errors.forEach(e => {
+        const card = document.createElement('div');
+        card.className = 'error-card';
+        card.id = 'card-' + e.id;
+        card.innerHTML = `
+          <div class="status-dot"></div>
+          <span class="card-tag ${e.tagClass}">${e.tag}</span>
+          <div class="card-emoji">${e.emoji}</div>
+          <div class="card-title">${e.label}</div>
+          <div class="card-desc">${e.desc}</div>
+        `;
+        card.onclick = () => { if (confirm(`「${e.label}」を発火しますか？`)) trigger(e.id, e.label); };
+        row.appendChild(card);
+      });
+    }
+
+    buildRow('row1', ROW1);
+    buildRow('row2', ROW2);
+
+    function addLog(msg, type = 'info') {
+      const log = document.getElementById('log');
+      const entry = document.createElement('div');
+      entry.className = 'log-entry';
+      const now = new Date().toLocaleTimeString('ja-JP');
+      entry.innerHTML = `<span class="log-time">${now}</span><span class="log-msg ${type}">${msg}</span>`;
+      log.appendChild(entry);
+      log.scrollTop = log.scrollHeight;
+    }
+
+    function clearLog() {
+      document.getElementById('log').innerHTML = '';
+    }
+
+    async function trigger(id, label) {
+      const card = document.getElementById('card-' + id);
+      card.classList.add('active');
+      addLog(`発火: ${label}`, 'info');
+      try {
+        const res = await fetch('/trigger', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: id }),
+        });
+        const data = await res.json();
+        card.classList.remove('active');
+        if (data.status >= 400) {
+          card.classList.add('error-state');
+          setTimeout(() => card.classList.remove('error-state'), 4000);
+          addLog(`検知: ${label} → HTTP ${data.status} — Instanaにアラート送信`, 'err');
+        } else {
+          card.classList.add('success');
+          setTimeout(() => card.classList.remove('success'), 4000);
+          addLog(`完了: ${label} → HTTP ${data.status}`, 'ok');
+        }
+      } catch (e) {
+        card.classList.remove('active');
+        card.classList.add('error-state');
+        setTimeout(() => card.classList.remove('error-state'), 4000);
+        addLog(`エラー: ${e.message}`, 'err');
+      }
+    }
+  </script>
+</body>
+</html>
