@@ -11,3 +11,4 @@ bob-webhook/bob-run-*.log
 bob-webhook/bob-run.log
 bob-webhook/bob-run-*.log
 bob-webhook/processing-events.json
+bob-webhook/ecosystem.config.js
