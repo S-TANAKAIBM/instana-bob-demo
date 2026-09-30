@@ -113,6 +113,17 @@ pm2 list
 - bob-webhook/processing-events.json は実行時に自動生成されます（.gitignore 対象）
 - デモ用途のため、本番環境での使用は想定していません
 
+## Slack Bot Token が無効化された場合
+
+Slack は GitHub にトークンが push されると自動的にトークンを無効化します。
+bob-webhook/ecosystem.config.js は .gitignore 対象のため Git には上がりませんが、
+万が一無効化された場合は以下の手順で復旧してください。
+
+1. https://api.slack.com/apps にアクセスし「Instana Alert」アプリを開く
+2. OAuth & Permissions から Bot Token を再発行
+3. EC2 の bob-webhook/ecosystem.config.js の SLACK_BOT_TOKEN を新しいトークンに更新
+4. pm2 restart bob-webhook --update-env を実行
+
 ## 参考
 
 - IBM Instana Observability: https://www.ibm.com/products/instana
