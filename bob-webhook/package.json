@@ -1,0 +1,12 @@
+﻿{
+  "name": "bob-webhook",
+  "version": "1.0.0",
+  "description": "Instana alert webhook -> Bob Shell auto-analysis",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}

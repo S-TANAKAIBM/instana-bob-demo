@@ -7,3 +7,7 @@ node_modules/
 dist/
 .DS_Store
 bob-webhook/bob-run-*.log
+.bob/
+bob-webhook/bob-run.log
+bob-webhook/bob-run-*.log
+bob-webhook/processing-events.json
