@@ -8,21 +8,18 @@ const app = express();
 const PORT = 8080;
 const BOB_API_KEY = process.env.BOB_API_KEY || '';
 const WORKSPACE = '/home/ubuntu/instana-bob-demo';
-const SLACK_BOT_TOKEN = 'xoxb-12174613864995-12190377425700-uiXMXYeZwnja2HogZpYrExlU';
-const SLACK_CHANNEL_ID = 'C0C55KTRGSZ';
-// Bobのプロンプトからcurlで直接投稿できるようIncoming Webhookも残す
-const SLACK_WEBHOOK_URL = 'https://hooks.slack.com/services/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';
+const SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN || '';
+const SLACK_CHANNEL_ID = process.env.SLACK_CHANNEL_ID || '';
+const SLACK_WEBHOOK_URL = process.env.SLACK_WEBHOOK_URL || '';
 
 app.use(express.json());
 
-// 処理済み・処理中のイベントIDをファイルで管理（再起動後も有効）
 const PROCESSING_EVENTS_FILE = path.join(WORKSPACE, 'bob-webhook', 'processing-events.json');
 
 function loadProcessingEvents() {
   try {
     if (fs.existsSync(PROCESSING_EVENTS_FILE)) {
       const data = JSON.parse(fs.readFileSync(PROCESSING_EVENTS_FILE, 'utf8'));
-      // 1時間以上前のエントリは削除
       const now = Date.now();
       const fresh = Object.fromEntries(Object.entries(data).filter(([, ts]) => now - ts < 3600000));
       return fresh;
@@ -37,8 +34,6 @@ function saveProcessingEvents(events) {
 
 let processingEvents = loadProcessingEvents();
 
-// Slack API経由でメッセージを投稿する（スレッド対応）
-// thread_ts を指定するとスレッドに返信、省略すると新規投稿
 function postToSlackAPI(text, threadTs) {
   return new Promise(function(resolve, reject) {
     const bodyObj = {
@@ -80,26 +75,21 @@ function postToSlackAPI(text, threadTs) {
   });
 }
 
-// ヘルスチェック
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', service: 'bob-webhook' });
 });
 
-// Instana アラート受信エンドポイント
 app.post('/webhook/instana', (req, res) => {
   const payload = req.body;
   console.log('[WEBHOOK] Received Instana alert:', JSON.stringify(payload, null, 2));
 
-  // Instanaのペイロード構造: payload.issue or payload.alert
   const issue       = payload.issue || payload.alert || {};
   const alertTitle  = issue.text || issue.title || payload.title || 'Unknown Alert';
   const eventIdRaw  = issue.id || (payload.events && payload.events[0] && payload.events[0].id) || payload.id || 'N/A';
-  // ファイル名・重複排除キーを記号除去済みIDで統一（ハイフン等を含むIDの不一致を防ぐ）
   const eventId     = eventIdRaw !== 'N/A' ? eventIdRaw.replace(/[^a-zA-Z0-9]/g, '_') : 'N/A';
   const appName     = issue.entityLabel || issue.entity || issue.service || issue.applicationName || 'N/A';
   const state       = issue.state || payload.state || 'OPEN';
 
-  // 同じイベントIDは重複実行しない（ファイルベースで再起動後も有効）
   processingEvents = loadProcessingEvents();
   if (eventId !== 'N/A' && processingEvents[eventId]) {
     console.log('[WEBHOOK] Duplicate event ignored:', eventId);
@@ -117,12 +107,10 @@ app.post('/webhook/instana', (req, res) => {
 
   const timestamp = new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' });
   const logFile = path.join(WORKSPACE, 'bob-webhook', 'bob-run.log');
-  // アラートごとの個別ログファイル（tail -f でリアルタイム確認用）
   const alertLogFile = path.join(WORKSPACE, 'bob-webhook', 'bob-run-' + (eventId !== 'N/A' ? eventId : Date.now()) + '.log');
   fs.appendFileSync(logFile, '\n[' + timestamp + '] Alert received: ' + alertTitle + '\n');
   fs.writeFileSync(alertLogFile, '[' + timestamp + '] Alert received: ' + alertTitle + '\n');
 
-  // ① Slackに「調査開始」メッセージを投稿してスレッドtsを取得
   const safeEventId = eventId !== 'N/A' ? eventId : 'unknown';
   const startMsg = [
     ':rotating_light: *Instana Alert 受信 — Bob が調査を開始します*',
@@ -133,13 +121,12 @@ app.post('/webhook/instana', (req, res) => {
     '*イベントID:* ' + eventId,
     alertLink ? ('*Instana:* ' + alertLink) : '',
     '_Bob is analyzing..._',
-    '```tail -f ~/instana-bob-demo/bob-webhook/bob-run-' + safeEventId + '.log```',
+    '`	ail -f ~/instana-bob-demo/bob-webhook/bob-run-' + safeEventId + '.log`',
   ].filter(Boolean).join('\n');
 
   postToSlackAPI(startMsg).then(function(threadTs) {
     console.log('[WEBHOOK] Thread ts:', threadTs);
 
-    // ② Bobへのプロンプト（スレッドtsをSlack投稿指示に含める）
     const slackInstruction = threadTs
       ? '最後に必ずSlack Bot Token=' + SLACK_BOT_TOKEN + ' ChannelID=' + SLACK_CHANNEL_ID + ' thread_ts=' + threadTs + ' を使ってchat.postMessage APIでスレッドに結果を投稿してください。'
       : '最後に必ず以下のURLにcurlコマンドで結果を投稿してください。URL: ' + SLACK_WEBHOOK_URL;
@@ -172,14 +159,12 @@ app.post('/webhook/instana', (req, res) => {
     const alertLogFd = fs.openSync(alertLogFile, 'a');
     const mainLogFd  = fs.openSync(logFile, 'a');
 
-    // stdout/stderrをファイルディスクリプタに直接渡すことでバッファリングを回避
     const bobProc = spawn('bob', ['run', '--accept-license', '--trust', '--workspace', WORKSPACE, '--format', 'pretty', prompt], {
       cwd: WORKSPACE,
       env: bobEnv,
       stdio: ['ignore', alertLogFd, alertLogFd]
     });
 
-    // タイムアウト（10分）
     const timer = setTimeout(function() {
       bobProc.kill();
       console.log('[WEBHOOK] Bob timed out');
@@ -189,10 +174,7 @@ app.post('/webhook/instana', (req, res) => {
       clearTimeout(timer);
       fs.closeSync(alertLogFd);
       fs.closeSync(mainLogFd);
-      // mainLogにもalertLogの内容を追記
       try { fs.appendFileSync(logFile, fs.readFileSync(alertLogFile)); } catch(e) {}
-      // 完了後もIDは削除しない（1時間TTLで自動削除）
-      // Instanaが同じIDを再送してきても重複実行しないようにするため
       if (code !== 0) {
         console.error('[WEBHOOK] Bob exited with code:', code);
       } else {
@@ -202,7 +184,6 @@ app.post('/webhook/instana', (req, res) => {
     });
   });
 
-  // Instanaには即座に200を返す
   res.json({ status: 'accepted', message: 'Bob analysis started', eventId: eventId });
 });
 
