@@ -155,7 +155,7 @@
       { id: 'db_timeout',        label: 'DBタイムアウト',       emoji: '⏱',  tag: 'Database',    tagClass: 'tag-database',    desc: 'データベース接続を8秒間ブロック。Instanaがレスポンスタイムの異常を検知しアラートを発火。' },
       { id: 'deadlock',          label: 'デッドロック検知',     emoji: '⚔️',  tag: 'Database',    tagClass: 'tag-database',    desc: '同一トランザクションの二重ロック取得によりデッドロックを発生。DBエラーとしてトレースに記録。' },
       { id: 'slow_query',        label: 'スロークエリ',         emoji: '🐌',  tag: 'Performance', tagClass: 'tag-performance', desc: 'レスポンスを5秒間遅延。Instanaのレイテンシグラフに異常スパイクとして記録される。' },
-      { id: 'inject_latency', label: 'N+1クエリ バグ注入', emoji: '🐛', tag: 'Bug Inject', tagClass: 'tag-dependency', desc: '商品一覧APIにN+1クエリのバグを注入。レイテンシが急増しInstanaがアラートを発火。BobがPRを自動作成して修正。エラー発火後はマージまで実行するか、手動修正ボタンで正常に戻してください。', fixBtn: true },
+      { id: 'inject_latency', label: 'N+1クエリ バグ注入', emoji: '🐛', tag: 'Bug Inject', tagClass: 'tag-dependency', desc: '商品一覧APIにN+1クエリのバグを注入。レイテンシが急増しInstanaがアラートを発火。BobがPRを自動作成します。レビュー後にマージするか、手動修正ボタンでエラーを解除してください。', fixBtn: true },
     ];
 
     function buildRow(rowId, errors) {
