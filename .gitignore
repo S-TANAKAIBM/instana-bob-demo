@@ -6,3 +6,4 @@ node_modules/
 .next/
 dist/
 .DS_Store
+bob-webhook/bob-run-*.log

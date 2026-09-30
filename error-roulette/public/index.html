@@ -49,6 +49,7 @@
       width: 10px; height: 10px; border-radius: 50%;
       position: absolute; top: 18px; right: 18px;
       background: #6f6f6f;
+      display: none;
     }
     .error-card.active .status-dot { background: #0f62fe; animation: pulse 1s infinite; }
     .error-card.success .status-dot { background: #24a148; }
@@ -67,10 +68,23 @@
     .tag-infrastructure { background: #005d5d; color: white; }
     .tag-performance    { background: #b28600; color: white; }
     .tag-dependency     { background: #9f1853; color: white; }
+    .tag-buginjected    { background: #6929c4; color: white; }
 
     .card-emoji { font-size: 2.2rem; }
     .card-title { font-size: 16px; font-weight: 800; color: #f4f4f4; }
     .card-desc  { font-size: 15px; color: #c6c6c6; line-height: 1.6; flex: 1; }
+    .fix-btn {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 4px 10px;
+      background: #024f1e; color: #ffffff;
+      border: 1px solid #24a148;
+      font-size: 12px; font-weight: 700; cursor: pointer;
+      transition: background 0.15s;
+      white-space: nowrap;
+      align-self: center;
+    }
+    .fix-btn:hover { background: #022d0d; }
+    .fix-btn.fixing { opacity: 0.6; cursor: not-allowed; }
 
     .log-section { background: #262626; padding: 24px; margin-top: 32px; }
     .log-header { display: flex; align-items: center; margin-bottom: 16px; }
@@ -111,7 +125,7 @@
 
     <!-- 上段: HTTP Error × 1, Infrastructure × 3 -->
     <div class="row" id="row1"></div>
-    <!-- 下段: Database × 2, Performance × 1, Dependency × 1 -->
+    <!-- 下段: Database × 2, Performance × 1, Bug Inject × 1 -->
     <div class="row" id="row2"></div>
 
     <div class="log-section">
@@ -141,7 +155,7 @@
       { id: 'db_timeout',        label: 'DBタイムアウト',       emoji: '⏱',  tag: 'Database',    tagClass: 'tag-database',    desc: 'データベース接続を8秒間ブロック。Instanaがレスポンスタイムの異常を検知しアラートを発火。' },
       { id: 'deadlock',          label: 'デッドロック検知',     emoji: '⚔️',  tag: 'Database',    tagClass: 'tag-database',    desc: '同一トランザクションの二重ロック取得によりデッドロックを発生。DBエラーとしてトレースに記録。' },
       { id: 'slow_query',        label: 'スロークエリ',         emoji: '🐌',  tag: 'Performance', tagClass: 'tag-performance', desc: 'レスポンスを5秒間遅延。Instanaのレイテンシグラフに異常スパイクとして記録される。' },
-      { id: 'external_api_fail', label: '外部API呼び出し失敗', emoji: '🌐',  tag: 'Dependency',  tagClass: 'tag-dependency',  desc: '存在しない外部APIにリクエストを送信。Instanaの依存関係マップで失敗した外部呼び出しを可視化。' },
+      { id: 'inject_latency', label: 'N+1クエリ バグ注入', emoji: '🐛', tag: 'Bug Inject', tagClass: 'tag-dependency', desc: '商品一覧APIにN+1クエリのバグを注入。レイテンシが急増しInstanaがアラートを発火。BobがPRを自動作成して修正。エラー発火後はマージまで実行するか、手動修正ボタンで正常に戻してください。', fixBtn: true },
     ];
 
     function buildRow(rowId, errors) {
@@ -152,7 +166,10 @@
         card.id = 'card-' + e.id;
         card.innerHTML = `
           <div class="status-dot"></div>
-          <span class="card-tag ${e.tagClass}">${e.tag}</span>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <span class="card-tag ${e.tagClass}">${e.tag}</span>
+            ${e.fixBtn ? '<button class="fix-btn" id="fix-btn-' + e.id + '" onclick="event.stopPropagation();fixLatency()">🔧 手動修正</button>' : ''}
+          </div>
           <div class="card-emoji">${e.emoji}</div>
           <div class="card-title">${e.label}</div>
           <div class="card-desc">${e.desc}</div>
@@ -160,6 +177,33 @@
         card.onclick = () => { if (confirm(`「${e.label}」を発火しますか？`)) trigger(e.id, e.label); };
         row.appendChild(card);
       });
+    }
+
+    async function fixLatency() {
+      if (!confirm('エラーを修正してよろしいですか？\nN+1クエリバグを解除し、/api/products を正常に戻します。')) return;
+      const btn = document.getElementById('fix-btn-inject_latency');
+      const card = document.getElementById('card-inject_latency');
+      btn.classList.add('fixing');
+      btn.textContent = '🔧 修正中...';
+      addLog('手動修正: N+1クエリバグを解除します', 'info');
+      try {
+        const res = await fetch('/trigger', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'fix_latency' }),
+        });
+        const data = await res.json();
+        btn.classList.remove('fixing');
+        btn.textContent = '🔧 手動修正';
+        card.classList.remove('error-state');
+        card.classList.add('success');
+        setTimeout(() => card.classList.remove('success'), 3000);
+        addLog('手動修正完了: /api/products のレイテンシを正常化しました', 'ok');
+      } catch (e) {
+        btn.classList.remove('fixing');
+        btn.textContent = '🔧 手動修正';
+        addLog('修正失敗: ' + e.message, 'err');
+      }
     }
 
     buildRow('row1', ROW1);

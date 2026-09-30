@@ -1,0 +1,12 @@
+{
+  "name": "instana-mcp-server",
+  "version": "1.0.0",
+  "description": "Instana MCP server for Bob Shell",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  }
+}
