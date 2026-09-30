@@ -8,7 +8,7 @@ const app = express();
 const PORT = 8080;
 const BOB_API_KEY = process.env.BOB_API_KEY || '';
 const WORKSPACE = '/home/ubuntu/instana-bob-demo';
-const SLACK_BOT_TOKEN = 'xoxb-12174613864995-12190377425700-6My9nQjkGs4qAqDWGhOkS5x4';
+const SLACK_BOT_TOKEN = 'xoxb-12174613864995-12190377425700-uiXMXYeZwnja2HogZpYrExlU';
 const SLACK_CHANNEL_ID = 'C0C55KTRGSZ';
 // Bobのプロンプトからcurlで直接投稿できるようIncoming Webhookも残す
 const SLACK_WEBHOOK_URL = 'https://hooks.slack.com/services/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';
