@@ -38,9 +38,9 @@ IBM Instana でエラーを検知し、IBM Bob が原因分析から GitHub PR �
 
 | サービス | URL |
 |---|---|
-| オンラインショップ | http://3.227.230.6:3000 |
-| エラー発火ツール | http://3.227.230.6:8001 |
-| バックエンドAPI | http://3.227.230.6:8000 |
+| オンラインショップ | http://<サーバーIP>:3000 |
+| エラー発火ツール | http://<サーバーIP>:8001 |
+| バックエンドAPI | http://<サーバーIP>:8000 |
 | Instana | https://ibmdevsandbox-instanaibm.instana.io/ |
 
 ## エラー発火ツールの種類
