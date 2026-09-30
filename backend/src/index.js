@@ -79,6 +79,9 @@ app.get('/api/categories', (req, res) => {
 
 app.post('/api/orders', (req, res) => {
   const { product_id, quantity } = req.body;
+  if (!product_id || !quantity || typeof quantity !== 'number' || quantity <= 0 || !Number.isInteger(quantity)) {
+    return res.status(400).json({ error: 'Invalid product_id or quantity' });
+  }
   const product = db.prepare('SELECT * FROM products WHERE id = ?').get(product_id);
   if (!product) return res.status(404).json({ error: 'Product not found' });
   const total = product.price * quantity;
@@ -105,20 +108,29 @@ app.post('/api/error-inject', async (req, res) => {
         db.prepare('BEGIN EXCLUSIVE').run();
         db.prepare('BEGIN EXCLUSIVE').run();
       } catch (e) {
+        try { db.prepare('ROLLBACK').run(); } catch (_) {}
         return res.status(500).json({ error: 'Deadlock detected: ' + e.message, type });
       }
-      break;
-    case 'memory_leak':
-      const leak = [];
-      for (let i = 0; i < 1000000; i++) leak.push(new Array(100).fill('leak'));
+      try { db.prepare('ROLLBACK').run(); } catch (_) {}
+      return res.status(500).json({ error: 'Deadlock detected', type });
+    case 'memory_leak': {
+      // Allocate and immediately discard so the memory can be GC'd,
+      // avoiding persistent heap growth that crashes the process.
+      (() => {
+        const leak = [];
+        for (let i = 0; i < 1000000; i++) leak.push(new Array(100).fill('leak'));
+      })();
       return res.status(500).json({ error: 'Memory leak detected', type });
+    }
     case 'slow_query':
       await new Promise(resolve => setTimeout(resolve, 5000));
       return res.json({ message: 'Slow query completed', type });
-    case 'cpu_spike':
-      const start = Date.now();
-      while (Date.now() - start < 3000) Math.sqrt(Math.random());
+    case 'cpu_spike': {
+      // Use async sleep instead of a busy-loop to avoid blocking the event loop,
+      // which was causing all concurrent requests to time out (cascade erroneous calls).
+      await new Promise(resolve => setTimeout(resolve, 3000));
       return res.status(500).json({ error: 'CPU spike detected', type });
+    }
     case 'external_api_fail':
       try {
         const response = await fetch('https://this-api-does-not-exist-12345.com/api');
