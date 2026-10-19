@@ -17,7 +17,6 @@ const ERROR_TYPES = [
   { id: 'memory_leak',      label: 'メモリリーク検知',           emoji: '🔥' },
   { id: 'slow_query',       label: 'スロークエリ発生',           emoji: '🐌' },
   { id: 'cpu_spike',        label: 'CPU使用率100%',            emoji: '🌡' },
-  { id: 'inject_latency',   label: 'N+1クエリ バグ注入',         emoji: '🐛' },
   { id: 'disk_full',        label: 'ディスク容量不足',           emoji: '💾' },
 ];
 
